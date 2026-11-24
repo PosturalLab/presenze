@@ -80,7 +80,7 @@ textarea{width:100%;font:12px monospace;border:1px solid var(--bd);border-radius
    ===================================================================== */
 const SRC='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
 let BRAND={};try{BRAND=JSON.parse(document.getElementById('brand').textContent)||{}}catch(e){}
-const KEY='pp_data_v1', PINKEY='pp_pin_v1', MAXPKG_LINK=5;
+const KEY='pp_data_v1', PINKEY='pp_pin_v2', MAXPKG_LINK=5;
 const $=s=>document.querySelector(s);
 const app=$('#app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -105,7 +105,8 @@ const findM=id=>D.iscritti.find(m=>m.id===id);
 
 /* ---------- PIN amministratore (hash SHA-256) ---------- */
 async function sha(s){const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('pp-'+s));return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-let logged=sessionStorage.getItem('pp_ok')==='1';
+try{localStorage.removeItem('pp_pin_v1')}catch(e){}
+let logged=sessionStorage.getItem('pp_ok')==='1'&&!!localStorage.getItem(PINKEY);
 
 /* =====================================================================
    VISTA ISCRITTO
@@ -143,16 +144,17 @@ async function loginView(){
   const has=!!localStorage.getItem(PINKEY);
   app.innerHTML=`<div class="card" style="max-width:380px;margin:40px auto">
     <h2>${has?'Accesso amministratore':'Primo avvio: crea il tuo PIN'}</h2>
-    <p class="mut">${has?'Inserisci il PIN.':'Il PIN protegge l\'area di gestione su questo dispositivo. Minimo 4 cifre.'}</p>
-    <input id="pin" type="password" inputmode="numeric" placeholder="PIN">
-    ${has?'':'<input id="pin2" type="password" inputmode="numeric" placeholder="Ripeti PIN" style="margin-top:8px">'}
+    <p class="mut">${has?'Inserisci il PIN di 6 cifre.':'Scegli un PIN di 6 cifre: protegge l\'area di gestione su questo dispositivo.'}</p>
+    <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="PIN (6 cifre)">
     <button id="go" style="width:100%;margin-top:12px">${has?'Entra':'Crea PIN ed entra'}</button></div>`;
   const go=async()=>{
     const p=$('#pin').value.trim();
+    if(!/^\d{6}$/.test(p))return toast('Il PIN deve essere di 6 cifre');
     if(has){ if(await sha(p)===localStorage.getItem(PINKEY)){sessionStorage.setItem('pp_ok','1');logged=true;render()} else toast('PIN errato'); }
-    else{ if(p.length<4)return toast('Minimo 4 caratteri'); if(p!==$('#pin2').value.trim())return toast('I PIN non coincidono');
+    else{ 
       localStorage.setItem(PINKEY,await sha(p));sessionStorage.setItem('pp_ok','1');logged=true;save();render();}
   };
+  const pinIn=$('#pin');pinIn.focus();pinIn.oninput=()=>{pinIn.value=pinIn.value.replace(/\D/g,'').slice(0,6)};
   $('#go').onclick=go;app.querySelectorAll('input').forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')go()});
 }
 
@@ -325,7 +327,7 @@ function exportCSV(){
   D.iscritti.forEach(m=>{const p=cur(m);rows.push([m.nome,m.tel,m.email,fmtD(p.inizio),p.ingressi,usati(p),residui(p),stato(p)[0],p.presenze.length?fmtDT(p.presenze[p.presenze.length-1].ts):''].map(q).join(';'))});
   download('iscritti.csv','\ufeff'+rows.join('\r\n'),'text/csv');
 }
-async function changePin(){const a=prompt('PIN attuale');if(a===null)return;if(await sha(a)!==localStorage.getItem(PINKEY))return toast('PIN errato');const n=prompt('Nuovo PIN (min 4)');if(!n||n.length<4)return toast('PIN non valido');localStorage.setItem(PINKEY,await sha(n));toast('PIN aggiornato')}
+async function changePin(){const a=prompt('PIN attuale');if(a===null)return;if(await sha(a)!==localStorage.getItem(PINKEY))return toast('PIN errato');const n=prompt('Nuovo PIN (6 cifre)');if(n===null)return;if(!/^\d{6}$/.test(n.trim()))return toast('Il PIN deve essere di 6 cifre');localStorage.setItem(PINKEY,await sha(n.trim()));toast('PIN aggiornato')}
 
 
 /* =====================================================================
