@@ -102,6 +102,9 @@ const usati=p=>p.presenze.length;
 const residui=p=>p.ingressi-p.presenze.length;
 function stato(p){const r=residui(p);return r<=0?['Esaurito','b-ko']:r<=2?['In esaurimento','b-warn']:['Attivo','b-ok']}
 const findM=id=>D.iscritti.find(m=>m.id===id);
+/* presenza gia' registrata oggi (su qualsiasi pacchetto) */
+const oggiStr=()=>new Date().toDateString();
+const giaOggi=m=>m.pacchetti.some(p=>p.presenze.some(x=>new Date(x.ts).toDateString()===oggiStr()));
 
 /* ---------- PIN amministratore (hash SHA-256) ---------- */
 async function sha(s){const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('pp-'+s));return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('')}
@@ -158,7 +161,8 @@ async function loginView(){
   $('#go').onclick=go;app.querySelectorAll('input').forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')go()});
 }
 
-let filtro='';
+let filtro='', soloEsaur=false;
+function toggleEsaur(){soloEsaur=!soloEsaur;adminView();if(soloEsaur)setTimeout(()=>document.getElementById('lista')?.scrollIntoView({behavior:'smooth',block:'start'}),50)}
 let ordine=(()=>{try{return localStorage.getItem('pp_ord')==='desc'?'desc':'asc'}catch(e){return 'asc'}})();
 function setOrdine(v){ordine=v==='desc'?'desc':'asc';try{localStorage.setItem('pp_ord',ordine)}catch(e){}adminView()}
 function adminView(){
@@ -169,15 +173,16 @@ function adminView(){
   const presOggi=D.iscritti.reduce((s,m)=>s+m.pacchetti.reduce((t,p)=>t+p.presenze.filter(x=>new Date(x.ts).toDateString()===oggi).length,0),0);
   const inEsaur=D.iscritti.filter(m=>residui(cur(m))<=2).length;
   const f=filtro.toLowerCase();
-  const list=L.filter(m=>!f||m.nome.toLowerCase().includes(f)||(m.email||'').toLowerCase().includes(f)||(m.tel||'').includes(f));
+  const list=L.filter(m=>!soloEsaur||residui(cur(m))<=2).sort((a,b)=>soloEsaur?residui(cur(a))-residui(cur(b)):0).filter(m=>!f||m.nome.toLowerCase().includes(f)||(m.email||'').toLowerCase().includes(f)||(m.tel||'').includes(f));
   app.innerHTML=`${heroHtml(D.palestra)}
   <div class="stats" style="margin-bottom:14px">
     <div class="stat"><b>${D.iscritti.length}</b><span class="mut">Iscritti</span></div>
     <div class="stat"><b>${presOggi}</b><span class="mut">Presenze oggi</span></div>
-    <div class="stat"><b>${inEsaur}</b><span class="mut">In esaurimento</span></div>
+    <div class="stat" role="button" tabindex="0" title="Mostra chi sta finendo gli ingressi" onclick="toggleEsaur()" onkeydown="if(event.key==='Enter')toggleEsaur()" style="cursor:pointer;${soloEsaur?'border:2px solid var(--warn);background:#FFF6E8':''}"><b>${inEsaur}</b><span class="mut">In esaurimento ${soloEsaur?'✓':'›'}</span></div>
     <div class="stat"><b>${D.iscritti.filter(daNotificare).length}</b><span class="mut">Da notificare</span></div>
   </div>
-  <div class="card">
+  <div class="card" id="lista">
+    ${soloEsaur?`<div class="row" style="margin-bottom:10px;padding:8px 10px;background:#FFF6E8;border-radius:10px"><span class="grow"><b>Filtro attivo:</b> iscritti con 2 ingressi residui o meno (dal più urgente)</span><button class="sec" style="flex:0 0 auto" onclick="toggleEsaur()">Mostra tutti ✕</button></div>`:''}
     <div class="row" style="margin-bottom:6px">
       <input id="q" class="grow" placeholder="Cerca per nome, email o telefono" value="${esc(filtro)}">
       <select id="ord" aria-label="Ordina per nome" style="flex:0 0 auto;width:auto" onchange="setOrdine(this.value)">
@@ -193,8 +198,8 @@ function adminView(){
           <div class="mut">${usati(p)}/${p.ingressi} usati · <span class="badge ${cl}">${st}</span>${p.presenze.length?' · ultima '+fmtD(p.presenze[p.presenze.length-1].ts):''}</div>
         </div>
         <button class="sec" style="flex:0 0 auto;position:relative" title="Invia notifica all'iscritto" onclick="shareModal('${m.id}')">✉${daNotificare(m)?'<span style="position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;background:var(--acc)"></span>':''}</button>
-        <button class="ok" style="flex:0 0 auto" onclick="segna('${m.id}')" ${residui(p)<=0?'disabled title="Pacchetto esaurito"':''}>+1 presenza</button>
-      </div>`}).join(''):`<p class="mut center">${D.iscritti.length?'Nessun risultato':'Nessun iscritto. Aggiungi il primo con “+ Nuovo iscritto”.'}</p>`}
+        <button class="ok" style="flex:0 0 auto" onclick="segna('${m.id}')" ${residui(p)<=0?'disabled title="Pacchetto esaurito"':giaOggi(m)?'disabled title="Presenza di oggi già registrata"':''}>${giaOggi(m)?'✓ Oggi':'+1 presenza'}</button>
+      </div>`}).join(''):`<p class="mut center">${soloEsaur&&!f?'Nessun iscritto in esaurimento':D.iscritti.length?'Nessun risultato':'Nessun iscritto. Aggiungi il primo con “+ Nuovo iscritto”.'}</p>`}
   </div>
   ${infoCard()||`<div class="card"><b>Personalizza la palestra.</b> <span class="mut">Aggiungi foto di sfondo, indirizzo, orari e contatti.</span><div style="margin-top:8px"><button class="sec" onclick="brandModal()">Aggiungi foto e informazioni</button></div></div>`}
   ${backupReminder()}`;
@@ -211,6 +216,7 @@ function backupReminder(){
 function segna(id,nota){
   const m=findM(id),p=cur(m);
   if(residui(p)<=0)return toast('Pacchetto esaurito: attiva un nuovo pacchetto');
+  if(giaOggi(m))return toast(`${m.nome} ha già una presenza registrata oggi`);
   p.presenze.push({ts:Date.now(),nota:nota||''});save();
   const r=residui(p);
   toast(`Presenza segnata per ${m.nome}. Residui: ${r}`);
@@ -240,7 +246,7 @@ function detailView(id){
     <span class="badge ${cl}">${st}</span> <span class="mut">Pacchetto dal ${fmtD(p.inizio)}</span>
     <div class="row" style="margin-top:14px">
       <input id="nota" placeholder="Nota facoltativa (es. Pilates)">
-      <button class="ok" style="flex:0 0 auto" ${r<=0?'disabled':''} onclick="segna('${id}',$('#nota').value)">+1 presenza</button>
+      <button class="ok" style="flex:0 0 auto" ${r<=0||giaOggi(m)?'disabled':''} onclick="segna('${id}',$('#nota').value)">${giaOggi(m)?'✓ Presenza di oggi registrata':'+1 presenza'}</button>
     </div>
     <div class="row" style="margin-top:10px">
       <button class="${daNotificare(m)?'':'sec'}" onclick="shareModal('${id}')">✉ Notifica iscritto${daNotificare(m)?' •':''}</button>
