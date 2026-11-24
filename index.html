@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Presenze Palestra</title>
+<style>
+:root{--acc:#C0504D;--acc2:#E07B39;--bg:#FBF7F3;--card:#fff;--txt:#2E2622;--mut:#8A7F78;--ok:#3C8D5A;--warn:#D08A1E;--ko:#B23B3B;--bd:#EADFD6}
+*{box-sizing:border-box}
+body{margin:0;font-family:Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;min-height:100vh}
+body.bgimg{background:linear-gradient(rgba(251,247,243,.82),rgba(251,247,243,.9)),var(--bgurl) center/cover fixed no-repeat}
+.card{backdrop-filter:blur(2px)}
+.hero{border-radius:14px;overflow:hidden;margin-bottom:14px;background:#000 center/cover no-repeat;min-height:150px;display:flex;align-items:flex-end;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.hero div{width:100%;padding:14px 16px;background:linear-gradient(transparent,rgba(0,0,0,.7));color:#fff}
+.hero h2{color:#fff;font-size:22px;margin:0}
+.info p{margin:4px 0}
+.info a{color:var(--acc)}
+header{background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0}
+header .act button{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4)}
+main{max-width:900px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+button{font:inherit;border:0;border-radius:10px;padding:9px 14px;cursor:pointer;background:var(--acc);color:#fff}
+button.sec{background:#F1E8E1;color:var(--txt)}
+button.ok{background:var(--ok)}
+button.ghost{background:none;color:var(--acc);padding:4px 8px}
+button:disabled{opacity:.45;cursor:not-allowed}
+input,select{font:inherit;padding:10px;border:1px solid var(--bd);border-radius:10px;width:100%;background:#fff}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1}
+.grow{flex:1}
+.mut{color:var(--mut);font-size:13px}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:bold;color:#fff}
+.b-ok{background:var(--ok)}.b-warn{background:var(--warn)}.b-ko{background:var(--ko)}
+.member{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--bd)}
+.member:last-child{border-bottom:0}
+.member .info{flex:1;cursor:pointer}
+.member .name{font-weight:bold}
+.big{font-size:44px;font-weight:bold;color:var(--acc);line-height:1}
+.dots{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--acc);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--acc)}
+.dot.f{background:var(--acc);color:#fff}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:7px 6px;border-bottom:1px solid var(--bd);font-size:14px}
+th{color:var(--mut);font-weight:normal;font-size:12px;text-transform:uppercase}
+.hidden{display:none!important}
+.center{text-align:center}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2E2622;color:#fff;padding:10px 18px;border-radius:10px;z-index:20;opacity:0;transition:.3s;pointer-events:none}
+.toast.on{opacity:1}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:10;padding:16px}
+.modal .card{width:100%;max-width:460px;max-height:90vh;overflow:auto}
+h2{font-size:17px;margin:0 0 8px}
+h3{font-size:15px;margin:16px 0 6px}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{flex:1;min-width:85px;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:12px}
+.stat b{font-size:24px;display:block;color:var(--acc)}
+textarea{width:100%;font:12px monospace;border:1px solid var(--bd);border-radius:10px;padding:8px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="hdrTitle">Presenze Palestra</h1>
+  <div class="act" id="hdrAct"></div>
+</header>
+<main id="app"></main>
+<div class="toast" id="toast"></div>
+
+<script id="brand" type="application/json">{"maps":"https://maps.app.goo.gl/X5h6zPHZq9VSDrHKA"}</script>
+<script>
+/* =====================================================================
+   PRESENZE PALESTRA – applicativo in un solo file, senza server.
+   - Area amministratore: dati salvati nel browser (localStorage) del
+     dispositivo dell'amministratore, protetti da PIN. Backup esportabile.
+   - Area iscritto: ogni iscritto riceve un link personale che contiene
+     SOLO i suoi dati (dopo il simbolo #, che non viene mai inviato al
+     server di hosting). Ognuno vede quindi esclusivamente il proprio profilo.
+   ===================================================================== */
+const SRC='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+let BRAND={};try{BRAND=JSON.parse(document.getElementById('brand').textContent)||{}}catch(e){}
+const KEY='pp_data_v1', PINKEY='pp_pin_v1', MAXPKG_LINK=5;
+const $=s=>document.querySelector(s);
+const app=$('#app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtD=t=>new Date(t).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
+const fmtDT=t=>new Date(t).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2200)}
+
+/* ---------- codifica link iscritto (UTF-8 -> base64url) ---------- */
+function enc(o){const b=new TextEncoder().encode(JSON.stringify(o));let s='';b.forEach(x=>s+=String.fromCharCode(x));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+function dec(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const bin=atob(s);const b=Uint8Array.from(bin,c=>c.charCodeAt(0));return JSON.parse(new TextDecoder().decode(b))}
+
+/* ---------- dati ---------- */
+let D=load();
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||{palestra:BRAND.palestra||'La mia palestra',defIngressi:10,iscritti:[]}}catch(e){return{palestra:'La mia palestra',defIngressi:10,iscritti:[]}}}
+function save(){localStorage.setItem(KEY,JSON.stringify(D));D._dirty=true}
+const cur=m=>m.pacchetti[m.pacchetti.length-1];
+const usati=p=>p.presenze.length;
+const residui=p=>p.ingressi-p.presenze.length;
+function stato(p){const r=residui(p);return r<=0?['Esaurito','b-ko']:r<=2?['In esaurimento','b-warn']:['Attivo','b-ok']}
+const findM=id=>D.iscritti.find(m=>m.id===id);
+
+/* ---------- PIN amministratore (hash SHA-256) ---------- */
+async function sha(s){const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('pp-'+s));return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+let logged=sessionStorage.getItem('pp_ok')==='1';
+
+/* =====================================================================
+   VISTA ISCRITTO
+   ===================================================================== */
+function memberView(data){
+  $('#hdrTitle').textContent=data.g||'Presenze Palestra';
+  $('#hdrAct').innerHTML='';
+  const pk=data.p, c=pk[pk.length-1];
+  const r=c.t-c.d.length, [st,cl]=r<=0?['Esaurito','b-ko']:r<=2?['In esaurimento','b-warn']:['Attivo','b-ok'];
+  let dots='';for(let i=0;i<c.t;i++)dots+=`<div class="dot ${i<c.d.length?'f':''}">${i+1}</div>`;
+  const rows=c.d.slice().reverse().map((t,i)=>`<tr><td>${c.d.length-i}</td><td>${fmtDT(t)}</td></tr>`).join('')||'<tr><td colspan="2" class="mut">Nessuna presenza ancora</td></tr>';
+  const old=pk.slice(0,-1).reverse().map(p=>`<tr><td>${fmtD(p.i)}</td><td>${p.d.length}/${p.t}</td><td>${p.d.length?fmtD(p.d[p.d.length-1]):'-'}</td></tr>`).join('');
+  app.innerHTML=`${heroHtml(data.g||BRAND.palestra||'')}
+  <div class="card center">
+    <div class="mut">Ciao</div>
+    <h2 style="font-size:22px">${esc(data.n)}</h2>
+    <div class="big">${Math.max(r,0)}</div>
+    <div class="mut">ingressi residui su ${c.t}</div>
+    <div style="margin-top:8px"><span class="badge ${cl}">${st}</span></div>
+    <div class="dots" style="justify-content:center">${dots}</div>
+    <div class="mut">Pacchetto iniziato il ${fmtD(c.i)}</div>
+  </div>
+  <div class="card"><h2>Presenze del pacchetto attuale</h2>
+    <table><tr><th>#</th><th>Data e ora</th></tr>${rows}</table></div>
+  ${old?`<div class="card"><h2>Pacchetti precedenti</h2><table><tr><th>Inizio</th><th>Ingressi</th><th>Ultimo</th></tr>${old}</table></div>`:''}
+  ${infoCard()}
+  <p class="mut center">Dati aggiornati al ${fmtDT(data.u)}.<br>A ogni presenza riceverai un link aggiornato: salva l'ultimo nei preferiti.</p>`;
+}
+
+/* =====================================================================
+   VISTA AMMINISTRATORE
+   ===================================================================== */
+async function loginView(){
+  $('#hdrTitle').textContent='Presenze Palestra – Admin';$('#hdrAct').innerHTML='';
+  const has=!!localStorage.getItem(PINKEY);
+  app.innerHTML=`<div class="card" style="max-width:380px;margin:40px auto">
+    <h2>${has?'Accesso amministratore':'Primo avvio: crea il tuo PIN'}</h2>
+    <p class="mut">${has?'Inserisci il PIN.':'Il PIN protegge l\'area di gestione su questo dispositivo. Minimo 4 cifre.'}</p>
+    <input id="pin" type="password" inputmode="numeric" placeholder="PIN">
+    ${has?'':'<input id="pin2" type="password" inputmode="numeric" placeholder="Ripeti PIN" style="margin-top:8px">'}
+    <button id="go" style="width:100%;margin-top:12px">${has?'Entra':'Crea PIN ed entra'}</button></div>`;
+  const go=async()=>{
+    const p=$('#pin').value.trim();
+    if(has){ if(await sha(p)===localStorage.getItem(PINKEY)){sessionStorage.setItem('pp_ok','1');logged=true;render()} else toast('PIN errato'); }
+    else{ if(p.length<4)return toast('Minimo 4 caratteri'); if(p!==$('#pin2').value.trim())return toast('I PIN non coincidono');
+      localStorage.setItem(PINKEY,await sha(p));sessionStorage.setItem('pp_ok','1');logged=true;save();render();}
+  };
+  $('#go').onclick=go;app.querySelectorAll('input').forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')go()});
+}
+
+let filtro='';
+let ordine=(()=>{try{return localStorage.getItem('pp_ord')==='desc'?'desc':'asc'}catch(e){return 'asc'}})();
+function setOrdine(v){ordine=v==='desc'?'desc':'asc';try{localStorage.setItem('pp_ord',ordine)}catch(e){}adminView()}
+function adminView(){
+  $('#hdrTitle').textContent=D.palestra;
+  $('#hdrAct').innerHTML=`<button onclick="brandModal()">Palestra</button> <button onclick="settingsModal()">⚙︎ Impostazioni</button>`;
+  const L=D.iscritti.slice().sort((a,b)=>(ordine==='desc'?-1:1)*a.nome.localeCompare(b.nome,'it',{sensitivity:'base',numeric:true}));
+  const oggi=new Date().toDateString();
+  const presOggi=D.iscritti.reduce((s,m)=>s+m.pacchetti.reduce((t,p)=>t+p.presenze.filter(x=>new Date(x.ts).toDateString()===oggi).length,0),0);
+  const inEsaur=D.iscritti.filter(m=>residui(cur(m))<=2).length;
+  const f=filtro.toLowerCase();
+  const list=L.filter(m=>!f||m.nome.toLowerCase().includes(f)||(m.email||'').toLowerCase().includes(f)||(m.tel||'').includes(f));
+  app.innerHTML=`${heroHtml(D.palestra)}
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stat"><b>${D.iscritti.length}</b><span class="mut">Iscritti</span></div>
+    <div class="stat"><b>${presOggi}</b><span class="mut">Presenze oggi</span></div>
+    <div class="stat"><b>${inEsaur}</b><span class="mut">In esaurimento</span></div>
+    <div class="stat"><b>${D.iscritti.filter(daNotificare).length}</b><span class="mut">Da notificare</span></div>
+  </div>
+  <div class="card">
+    <div class="row" style="margin-bottom:6px">
+      <input id="q" class="grow" placeholder="Cerca per nome, email o telefono" value="${esc(filtro)}">
+      <select id="ord" aria-label="Ordina per nome" style="flex:0 0 auto;width:auto" onchange="setOrdine(this.value)">
+        <option value="asc" ${ordine==='asc'?'selected':''}>Nome A → Z</option>
+        <option value="desc" ${ordine==='desc'?'selected':''}>Nome Z → A</option>
+      </select>
+      <button style="flex:0 0 auto" onclick="memberModal()">+ Nuovo iscritto</button>
+    </div>
+    ${list.length?list.map(m=>{const p=cur(m),[st,cl]=stato(p);return `
+      <div class="member">
+        <div class="info" onclick="detailView('${m.id}')">
+          <div class="name">${esc(m.nome)}</div>
+          <div class="mut">${usati(p)}/${p.ingressi} usati · <span class="badge ${cl}">${st}</span>${p.presenze.length?' · ultima '+fmtD(p.presenze[p.presenze.length-1].ts):''}</div>
+        </div>
+        <button class="sec" style="flex:0 0 auto;position:relative" title="Invia notifica all'iscritto" onclick="shareModal('${m.id}')">✉${daNotificare(m)?'<span style="position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;background:var(--acc)"></span>':''}</button>
+        <button class="ok" style="flex:0 0 auto" onclick="segna('${m.id}')" ${residui(p)<=0?'disabled title="Pacchetto esaurito"':''}>+1 presenza</button>
+      </div>`}).join(''):`<p class="mut center">${D.iscritti.length?'Nessun risultato':'Nessun iscritto. Aggiungi il primo con “+ Nuovo iscritto”.'}</p>`}
+  </div>
+  ${infoCard()||`<div class="card"><b>Personalizza la palestra.</b> <span class="mut">Aggiungi foto di sfondo, indirizzo, orari e contatti.</span><div style="margin-top:8px"><button class="sec" onclick="brandModal()">Aggiungi foto e informazioni</button></div></div>`}
+  ${backupReminder()}`;
+  const q=$('#q');q.oninput=()=>{filtro=q.value;const pos=q.selectionStart;adminView();const n=$('#q');n.focus();n.setSelectionRange(pos,pos)};
+}
+function backupReminder(){
+  const last=D.ultimoBackup?new Date(D.ultimoBackup):null;
+  const days=last?Math.floor((Date.now()-last)/864e5):null;
+  if(last&&days<7)return `<p class="mut center">Ultimo backup: ${fmtD(last)}</p>`;
+  return `<div class="card" style="border-color:var(--warn)"><b>Ricorda il backup.</b> <span class="mut">I dati sono salvati solo in questo browser: ${last?'ultimo backup '+days+' giorni fa.':'non hai ancora fatto un backup.'}</span>
+  <div style="margin-top:8px"><button class="sec" onclick="exportJSON()">Scarica backup ora</button></div></div>`;
+}
+
+function segna(id,nota){
+  const m=findM(id),p=cur(m);
+  if(residui(p)<=0)return toast('Pacchetto esaurito: attiva un nuovo pacchetto');
+  p.presenze.push({ts:Date.now(),nota:nota||''});save();
+  const r=residui(p);
+  toast(`Presenza segnata per ${m.nome}. Residui: ${r}`);
+  if(location.hash.startsWith('#m='))detailView(id);else adminView();
+}
+/* aggiornamenti non ancora notificati all'iscritto */
+function lastChange(m){let t=m.creato;m.pacchetti.forEach(p=>{t=Math.max(t,p.inizio);p.presenze.forEach(x=>t=Math.max(t,x.ts))});return Math.max(t,m.modificato||0)}
+const daNotificare=m=>lastChange(m)>(m.notificato||0);
+function copyLink(u,id){(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast('Link copiato')).catch(()=>prompt('Copia il link:',u)).finally(()=>markSent(id))}
+function markSent(id){const m=findM(id);m.notificato=Date.now();save();setTimeout(()=>{closeModal();render()},300);toast('Notifica preparata per '+m.nome)}
+
+function detailView(id){
+  const m=findM(id);if(!m)return adminView();
+  history.replaceState(null,'','#m='+id);
+  const p=cur(m),[st,cl]=stato(p),r=residui(p);
+  let dots='';for(let i=0;i<p.ingressi;i++)dots+=`<div class="dot ${i<p.presenze.length?'f':''}">${i+1}</div>`;
+  const rows=p.presenze.map((x,i)=>({x,i})).reverse().map(({x,i})=>`<tr><td>${i+1}</td><td>${fmtDT(x.ts)}</td><td>${esc(x.nota)}</td><td><button class="ghost" title="Annulla" onclick="delPres('${id}',${i})">✕</button></td></tr>`).join('')||'<tr><td colspan="4" class="mut">Nessuna presenza</td></tr>';
+  const old=m.pacchetti.slice(0,-1).reverse().map(q=>`<tr><td>${fmtD(q.inizio)}</td><td>${q.presenze.length}/${q.ingressi}</td><td>${q.presenze.length?fmtD(q.presenze[q.presenze.length-1].ts):'-'}</td></tr>`).join('');
+  app.innerHTML=`
+  <button class="sec" onclick="back()">← Elenco</button>
+  <div class="card" style="margin-top:12px">
+    <div class="row"><div class="grow"><h2 style="font-size:20px">${esc(m.nome)}</h2>
+      <div class="mut">${esc(m.email||'')}${m.email&&m.tel?' · ':''}${esc(m.tel||'')}</div>
+      <div class="mut">Iscritto dal ${fmtD(m.creato)}</div></div>
+      <div style="flex:0 0 auto;text-align:right"><div class="big">${Math.max(r,0)}</div><div class="mut">residui su ${p.ingressi}</div></div></div>
+    <div class="dots">${dots}</div>
+    <span class="badge ${cl}">${st}</span> <span class="mut">Pacchetto dal ${fmtD(p.inizio)}</span>
+    <div class="row" style="margin-top:14px">
+      <input id="nota" placeholder="Nota facoltativa (es. Pilates)">
+      <button class="ok" style="flex:0 0 auto" ${r<=0?'disabled':''} onclick="segna('${id}',$('#nota').value)">+1 presenza</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="${daNotificare(m)?'':'sec'}" onclick="shareModal('${id}')">✉ Notifica iscritto${daNotificare(m)?' •':''}</button>
+      <button class="sec" onclick="pkgModal('${id}')">↻ Nuovo pacchetto</button>
+      <button class="sec" onclick="memberModal('${id}')">✎ Modifica</button>
+    </div>
+  </div>
+  <div class="card"><h2>Presenze pacchetto attuale</h2><table><tr><th>#</th><th>Data e ora</th><th>Nota</th><th></th></tr>${rows}</table></div>
+  ${old?`<div class="card"><h2>Pacchetti precedenti</h2><table><tr><th>Inizio</th><th>Ingressi</th><th>Ultimo</th></tr>${old}</table></div>`:''}
+  <p class="center"><button class="ghost" style="color:var(--ko)" onclick="delMember('${id}')">Elimina iscritto</button></p>`;
+}
+function back(){history.replaceState(null,'',location.pathname);adminView()}
+function delPres(id,i){if(!confirm('Annullare questa presenza?'))return;cur(findM(id)).presenze.splice(i,1);save();detailView(id);toast('Presenza annullata')}
+function delMember(id){const m=findM(id);if(!confirm(`Eliminare definitivamente ${m.nome} e tutto il suo storico?`))return;D.iscritti=D.iscritti.filter(x=>x.id!==id);save();back();toast('Iscritto eliminato')}
+
+/* ---------- modali ---------- */
+function modal(html){const w=document.createElement('div');w.className='modal';w.innerHTML=`<div class="card">${html}</div>`;w.onclick=e=>{if(e.target===w)w.remove()};document.body.appendChild(w);return w}
+function closeModal(){document.querySelectorAll('.modal').forEach(x=>x.remove())}
+
+function memberModal(id){
+  const m=id?findM(id):null;
+  modal(`<h2>${m?'Modifica iscritto':'Nuovo iscritto'}</h2>
+    <label>Nome e cognome *</label><input id="f_n" value="${esc(m?.nome)}">
+    <label>Cellulare (per WhatsApp, con prefisso es. 393331234567)</label><input id="f_t" inputmode="tel" value="${esc(m?.tel)}">
+    <label>Email</label><input id="f_e" type="email" value="${esc(m?.email)}">
+    ${m?'':`<label>Ingressi del pacchetto</label><input id="f_i" type="number" min="1" value="${D.defIngressi}">`}
+    <div class="row" style="margin-top:16px"><button class="sec" onclick="closeModal()">Annulla</button><button id="f_ok">Salva</button></div>`);
+  $('#f_n').focus();
+  $('#f_ok').onclick=()=>{
+    const nome=$('#f_n').value.trim();if(!nome)return toast('Inserisci il nome');
+    const tel=$('#f_t').value.replace(/[^\d]/g,''),email=$('#f_e').value.trim();
+    if(m){m.nome=nome;m.tel=tel;m.email=email;m.modificato=Date.now();save();closeModal();detailView(m.id);return}
+    const n={id:uid(),nome,tel,email,creato:Date.now(),pacchetti:[{inizio:Date.now(),ingressi:Math.max(1,parseInt($('#f_i').value)||D.defIngressi),presenze:[]}]};
+    D.iscritti.push(n);save();closeModal();detailView(n.id);toast('Iscritto aggiunto');
+  };
+}
+function pkgModal(id){
+  const m=findM(id);
+  modal(`<h2>Nuovo pacchetto per ${esc(m.nome)}</h2>
+    <p class="mut">Il pacchetto attuale (${usati(cur(m))}/${cur(m).ingressi}) viene archiviato nello storico.</p>
+    <label>Ingressi</label><input id="p_i" type="number" min="1" value="${D.defIngressi}">
+    <div class="row" style="margin-top:16px"><button class="sec" onclick="closeModal()">Annulla</button><button id="p_ok">Attiva</button></div>`);
+  $('#p_ok').onclick=()=>{m.pacchetti.push({inizio:Date.now(),ingressi:Math.max(1,parseInt($('#p_i').value)||10),presenze:[]});save();closeModal();detailView(id);toast('Nuovo pacchetto attivato')};
+}
+function memberLink(m){
+  const data={g:D.palestra,n:m.nome,u:Date.now(),p:m.pacchetti.slice(-MAXPKG_LINK).map(p=>({i:p.inizio,t:p.ingressi,d:p.presenze.map(x=>x.ts)}))};
+  return location.origin+location.pathname+'#p='+enc(data);
+}
+function shareModal(id){
+  const m=findM(id),url=memberLink(m),p=cur(m);
+  const msg=`Ciao ${m.nome.split(' ')[0]}! Ecco il tuo profilo aggiornato in ${D.palestra}: ingressi residui ${Math.max(residui(p),0)} su ${p.ingressi}.\n${url}`;
+  const isFile=location.protocol==='file:';
+  modal(`<h2>Notifica a ${esc(m.nome)}</h2>
+    <p class="mut">Invia all'iscritto il riepilogo e il link al suo profilo, aggiornati a ora. Il link contiene solo i suoi dati.</p>
+    <p class="mut">${m.notificato?'Ultima notifica: '+fmtDT(m.notificato):'Mai notificato'}${daNotificare(m)?' · <b style="color:var(--acc)">ci sono aggiornamenti non inviati</b>':''}</p>
+    ${isFile?'<p style="color:var(--ko)"><b>Attenzione:</b> stai usando il file in locale. Pubblica l\'app online (vedi guida) prima di inviare i link.</p>':''}
+    <div class="row" style="margin-top:10px">
+      <button class="ok" ${m.tel?'':'disabled title="Cellulare mancante"'} onclick="window.open('https://wa.me/${m.tel}?text='+encodeURIComponent(${esc(JSON.stringify(msg))}));markSent('${id}')">WhatsApp</button>
+      <button ${m.email?'':'disabled title="Email mancante"'} onclick="location.href='mailto:${esc(m.email)}?subject='+encodeURIComponent('Il tuo profilo palestra')+'&body='+encodeURIComponent(${esc(JSON.stringify(msg))});markSent('${id}')">Email</button>
+      <button class="sec" onclick="copyLink(${esc(JSON.stringify(url))},'${id}')">Copia link</button>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="sec" onclick="window.open(${esc(JSON.stringify(url))})">Anteprima</button><button class="sec" onclick="closeModal()">Chiudi</button></div>`);
+}
+function settingsModal(){
+  modal(`<h2>Impostazioni</h2>
+    <label>Nome palestra</label><input id="s_n" value="${esc(D.palestra)}">
+    <label>Ingressi predefiniti per pacchetto</label><input id="s_i" type="number" min="1" value="${D.defIngressi}">
+    <button style="margin-top:10px" onclick="D.palestra=$('#s_n').value.trim()||D.palestra;D.defIngressi=parseInt($('#s_i').value)||10;save();closeModal();adminView();toast('Salvato')">Salva</button>
+    <h3>Backup e trasferimento</h3>
+    <p class="mut">Per usare l'app su un altro dispositivo: scarica il backup qui e caricalo sull'altro.</p>
+    <div class="row"><button class="sec" onclick="exportJSON()">Scarica backup (.json)</button><button class="sec" onclick="$('#imp').click()">Carica backup</button></div>
+    <input type="file" id="imp" accept=".json,application/json" class="hidden" onchange="importJSON(this.files[0])">
+    <div class="row" style="margin-top:8px"><button class="sec" onclick="exportCSV()">Esporta Excel (.csv)</button></div>
+    <h3>Sicurezza</h3>
+    <div class="row"><button class="sec" onclick="changePin()">Cambia PIN</button><button class="sec" onclick="sessionStorage.removeItem('pp_ok');logged=false;closeModal();render()">Esci</button></div>
+    <div class="row" style="margin-top:16px"><button class="sec" onclick="closeModal()">Chiudi</button></div>`);
+}
+function download(name,content,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function exportJSON(){D.ultimoBackup=Date.now();localStorage.setItem(KEY,JSON.stringify(D));download(`backup_palestra_${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(D,null,1),'application/json');toast('Backup scaricato');if(!document.querySelector('.modal'))render()}
+function importJSON(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.iscritti))throw 0;if(!confirm(`Sostituire i dati attuali con il backup (${d.iscritti.length} iscritti)?`))return;D=d;save();closeModal();adminView();toast('Backup caricato')}catch(e){toast('File non valido')}};r.readAsText(f)}
+function exportCSV(){
+  const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+  const rows=[['Nome','Cellulare','Email','Inizio pacchetto','Ingressi','Usati','Residui','Stato','Ultima presenza'].map(q).join(';')];
+  D.iscritti.forEach(m=>{const p=cur(m);rows.push([m.nome,m.tel,m.email,fmtD(p.inizio),p.ingressi,usati(p),residui(p),stato(p)[0],p.presenze.length?fmtDT(p.presenze[p.presenze.length-1].ts):''].map(q).join(';'))});
+  download('iscritti.csv','\ufeff'+rows.join('\r\n'),'text/csv');
+}
+async function changePin(){const a=prompt('PIN attuale');if(a===null)return;if(await sha(a)!==localStorage.getItem(PINKEY))return toast('PIN errato');const n=prompt('Nuovo PIN (min 4)');if(!n||n.length<4)return toast('PIN non valido');localStorage.setItem(PINKEY,await sha(n));toast('PIN aggiornato')}
+
+
+/* =====================================================================
+   PERSONALIZZAZIONE: foto di sfondo e informazioni della palestra.
+   Vengono incorporate nel file HTML esportato, così le vede anche
+   ogni iscritto aprendo il proprio link.
+   ===================================================================== */
+const B=()=>Object.assign({},BRAND,D.brand||{});
+function applyBg(){const b=B();if(b.foto){document.body.classList.add('bgimg');document.body.style.setProperty('--bgurl',`url(${b.foto})`)}else document.body.classList.remove('bgimg')}
+function infoCard(){
+  const b=B();const has=b.indirizzo||b.telefono||b.email||b.orari||b.maps||b.sito||b.note;
+  if(!has)return '';
+  const tel=(b.telefono||'').replace(/[^\d+]/g,'');
+  return `<div class="card info"><h2>Informazioni</h2>
+   ${b.indirizzo?`<p><b>Indirizzo:</b> ${esc(b.indirizzo)}</p>`:''}
+   ${b.telefono?`<p><b>Telefono:</b> <a href="tel:${esc(tel)}">${esc(b.telefono)}</a></p>`:''}
+   ${b.email?`<p><b>Email:</b> <a href="mailto:${esc(b.email)}">${esc(b.email)}</a></p>`:''}
+   ${b.orari?`<p style="white-space:pre-line"><b>Orari:</b>\n${esc(b.orari)}</p>`:''}
+   ${b.note?`<p class="mut" style="white-space:pre-line">${esc(b.note)}</p>`:''}
+   <div class="row" style="margin-top:8px">
+    ${b.maps?`<a href="${esc(b.maps)}" target="_blank" rel="noopener"><button class="sec">Indicazioni su Maps</button></a>`:''}
+    ${b.sito?`<a href="${esc(b.sito)}" target="_blank" rel="noopener"><button class="sec">Sito / Social</button></a>`:''}
+   </div></div>`;
+}
+function heroHtml(title){const b=B();if(!b.foto)return '';return `<div class="hero" style="background-image:url(${b.foto})"><div><h2>${esc(title)}</h2>${b.indirizzo?`<span style="font-size:13px">${esc(b.indirizzo)}</span>`:''}</div></div>`}
+function resizeImg(file){return new Promise((ok,ko)=>{const r=new FileReader();r.onerror=ko;r.onload=()=>{const im=new Image();im.onerror=ko;im.onload=()=>{const M=1600,k=Math.min(1,M/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.72))};im.src=r.result};r.readAsDataURL(file)})}
+function brandModal(){
+  const b=B();
+  modal(`<h2>Palestra: foto e informazioni</h2>
+   <label>Foto di sfondo</label>
+   ${b.foto?`<img src="${b.foto}" style="width:100%;border-radius:10px;max-height:160px;object-fit:cover">`:'<p class="mut">Nessuna foto caricata.</p>'}
+   <div class="row"><button class="sec" onclick="$('#b_f').click()">${b.foto?'Cambia foto':'Carica foto'}</button>${b.foto?'<button class="sec" onclick="setBrand({foto:\'\'})">Rimuovi</button>':''}</div>
+   <input type="file" id="b_f" accept="image/*" class="hidden">
+   <label>Indirizzo</label><input id="b_i" value="${esc(b.indirizzo)}">
+   <label>Telefono</label><input id="b_t" value="${esc(b.telefono)}">
+   <label>Email</label><input id="b_e" value="${esc(b.email)}">
+   <label>Orari</label><textarea id="b_o" rows="3" style="font:inherit">${esc(b.orari)}</textarea>
+   <label>Link Google Maps</label><input id="b_m" value="${esc(b.maps)}">
+   <label>Sito o pagina social</label><input id="b_s" value="${esc(b.sito)}">
+   <label>Note per gli iscritti</label><textarea id="b_n" rows="2" style="font:inherit">${esc(b.note)}</textarea>
+   <div class="row" style="margin-top:14px"><button class="sec" onclick="closeModal()">Chiudi</button><button id="b_ok">Salva</button></div>
+   <h3>Pubblica la versione personalizzata</h3>
+   <p class="mut">Gli iscritti vedono foto e informazioni solo se carichi online questo file aggiornato al posto del precedente, <b>con lo stesso nome</b>.</p>
+   <button class="ok" onclick="exportApp()">Scarica app personalizzata (.html)</button>`);
+  $('#b_f').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const u=await resizeImg(f);setBrand({foto:u})}catch(x){toast('Immagine non valida')}};
+  $('#b_ok').onclick=()=>{setBrand({indirizzo:$('#b_i').value.trim(),telefono:$('#b_t').value.trim(),email:$('#b_e').value.trim(),orari:$('#b_o').value.trim(),maps:$('#b_m').value.trim(),sito:$('#b_s').value.trim(),note:$('#b_n').value.trim()});toast('Informazioni salvate')};
+}
+function setBrand(o){D.brand=Object.assign(B(),o);try{save()}catch(e){toast('Immagine troppo grande');return}closeModal();applyBg();render();brandModal()}
+function exportApp(){
+  const b=Object.assign({},B(),{palestra:D.palestra});
+  const json=JSON.stringify(b).replace(/</g,'\\u003c');
+  const out=SRC.replace(/<script id="brand" type="application\/json">[\s\S]*?<\/script>/,'<script id="brand" type="application/json">'+json+'<\/script>');
+  download('index.html',out,'text/html');toast('App personalizzata scaricata');
+}
+
+/* ---------- avvio ---------- */
+function render(){
+  applyBg();
+  const h=location.hash;
+  if(h.startsWith('#p=')){try{return memberView(dec(h.slice(3)))}catch(e){app.innerHTML='<div class="card center"><h2>Link non valido</h2><p class="mut">Chiedi un nuovo link alla palestra.</p></div>';return}}
+  if(!logged)return loginView();
+  if(h.startsWith('#m=')&&findM(h.slice(3)))return detailView(h.slice(3));
+  adminView();
+}
+window.addEventListener('hashchange',render);
+render();
+</script>
+</body>
+</html>
